@@ -1,0 +1,184 @@
+name: Certificate Generation Demo
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run demo on Mondays at 6:00 AM UTC
+    - cron: '0 6 * * MON'
+
+jobs:
+  demo:
+    name: SSL Certificate Demo Workflow
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Build application
+      run: mvn clean package -DskipTests
+    
+    - name: Create demo certificate directory
+      run: |
+        mkdir -p demo-certificates
+        cd demo-certificates
+        
+    - name: Generate test CSR
+      run: |
+        echo "🔐 Generating Test CSR..."
+        # Using OpenSSL to generate demo CSR (before API is running)
+        openssl req -new -newkey rsa:2048 -nodes \
+          -keyout demo-certificates/demo-private.key \
+          -out demo-certificates/demo.csr \
+          -subj "/C=AU/ST=NSW/L=Sydney/O=VigLab/CN=ssl-demo.local"
+        echo "✅ CSR Generated Successfully"
+        cat demo-certificates/demo.csr
+    
+    - name: Generate self-signed certificate
+      run: |
+        echo "📜 Generating Self-Signed Certificate..."
+        openssl x509 -req -days 365 \
+          -in demo-certificates/demo.csr \
+          -signkey demo-certificates/demo-private.key \
+          -out demo-certificates/demo-certificate.crt \
+          -extfile /dev/stdin <<< "subjectAltName=DNS:ssl-demo.local,DNS:*.ssl-demo.local"
+        echo "✅ Certificate Generated Successfully"
+        
+        # Display certificate info
+        echo "📋 Certificate Details:"
+        openssl x509 -in demo-certificates/demo-certificate.crt -text -noout | head -20
+    
+    - name: Create PKCS12 keystore
+      run: |
+        echo "🔑 Creating PKCS12 Keystore..."
+        openssl pkcs12 -export \
+          -in demo-certificates/demo-certificate.crt \
+          -inkey demo-certificates/demo-private.key \
+          -out demo-certificates/demo-keystore.p12 \
+          -name ssl-demo \
+          -passout pass:demo-password
+        echo "✅ Keystore Created Successfully"
+        ls -lh demo-certificates/demo-keystore.p12
+    
+    - name: Verify certificate
+      run: |
+        echo "✔️  Verifying Certificate..."
+        openssl verify -CAfile demo-certificates/demo-certificate.crt \
+          demo-certificates/demo-certificate.crt || echo "⚠️  Self-signed certificate verification note"
+        
+        echo ""
+        echo "📊 Certificate Validity:"
+        openssl x509 -in demo-certificates/demo-certificate.crt -noout -dates
+    
+    - name: Display keystore contents
+      run: |
+        echo "📦 Keystore Contents:"
+        keytool -list -v -keystore demo-certificates/demo-keystore.p12 \
+          -storepass demo-password -storetype PKCS12 || true
+    
+    - name: Upload demo artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: demo-certificates
+        path: demo-certificates/
+        retention-days: 30
+    
+    - name: Create demo summary
+      run: |
+        cat > demo-summary.md << 'EOF'
+        # 🎓 SSL Certificate Generation Demo - Summary
+        
+        ## Generated Artifacts
+        
+        ### CSR (Certificate Signing Request)
+        - **File**: demo.csr
+        - **Algorithm**: RSA 2048-bit
+        - **Subject**: CN=ssl-demo.local, O=VigLab, L=Sydney, ST=NSW, C=AU
+        - **Status**: ✅ Generated Successfully
+        
+        ### Self-Signed Certificate
+        - **File**: demo-certificate.crt
+        - **Validity**: 365 days
+        - **Format**: PEM
+        - **Subject Alternative Names**: 
+          - ssl-demo.local
+          - *.ssl-demo.local
+        - **Status**: ✅ Generated Successfully
+        
+        ### PKCS12 Keystore
+        - **File**: demo-keystore.p12
+        - **Type**: PKCS12 (Java compatible)
+        - **Password**: demo-password
+        - **Entry Alias**: ssl-demo
+        - **Status**: ✅ Generated Successfully
+        
+        ## Key Files
+        
+        1. **demo-private.key** - RSA private key (2048-bit)
+        2. **demo.csr** - Certificate signing request
+        3. **demo-certificate.crt** - Self-signed certificate
+        4. **demo-keystore.p12** - Java keystore
+        
+        ## Usage
+        
+        ### Using in Spring Boot
+        ```properties
+        server.ssl.key-store=demo-keystore.p12
+        server.ssl.key-store-password=demo-password
+        server.ssl.key-store-type=PKCS12
+        server.ssl.key-alias=ssl-demo
+        server.ssl.enabled=true
+        ```
+        
+        ### Verify Certificate
+        ```bash
+        openssl x509 -in demo-certificate.crt -text -noout
+        ```
+        
+        ### View Keystore Contents
+        ```bash
+        keytool -list -v -keystore demo-keystore.p12 -storepass demo-password
+        ```
+        
+        ## Demo Information
+        
+        - **Generated**: $(date)
+        - **Environment**: GitHub Actions
+        - **Workflow**: Certificate Generation Demo
+        - **Status**: ✅ Success
+        
+        ---
+        
+        This is a demonstration of SSL certificate generation using OpenSSL.
+        For production use, obtain certificates from a trusted Certificate Authority.
+        EOF
+        
+        cat demo-summary.md
+    
+    - name: Upload demo summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: demo-summary
+        path: demo-summary.md
+        retention-days: 30
+    
+    - name: Print workflow summary
+      run: |
+        echo "✅ Certificate Generation Demo Complete"
+        echo "========================================="
+        echo "📦 Generated Artifacts:"
+        echo "  - demo.csr (Certificate Signing Request)"
+        echo "  - demo-certificate.crt (Self-Signed Certificate)"
+        echo "  - demo-keystore.p12 (Java Keystore)"
+        echo "  - demo-private.key (Private Key)"
+        echo ""
+        echo "🔗 Artifacts available for download from GitHub Actions"
+        echo ""
+        echo "⏰ Demo Execution Time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"

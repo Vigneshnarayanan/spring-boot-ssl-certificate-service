@@ -1,0 +1,59 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        java-version: [ 17 ]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Java ${{ matrix.java-version }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Build with Maven
+      run: mvn clean package -DskipTests
+    
+    - name: Run tests
+      run: mvn test
+    
+    - name: Generate code coverage report
+      run: mvn jacoco:report
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./target/site/jacoco/jacoco.xml
+        fail_ci_if_error: false
+    
+    - name: Upload build artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts-${{ matrix.java-version }}
+        path: target/
+        retention-days: 7
+    
+    - name: Print build summary
+      if: always()
+      run: |
+        echo "✅ Build & Test Summary"
+        echo "Java Version: ${{ matrix.java-version }}"
+        echo "Build Time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+        echo "Artifacts: target/"
