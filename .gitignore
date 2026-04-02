@@ -1,0 +1,52 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+.classpath
+.project
+.settings/
+
+# Build
+target/
+build/
+dist/
+*.jar
+*.war
+*.ear
+
+# Dependencies
+.maven/
+node_modules/
+*.lock
+
+# Environment
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application
+certificates-storage/csrs/*
+certificates-storage/certificates/*
+certificates-storage/keystores/*
+certificates-storage/logs/*
+
+# Keep the directories but ignore contents
+!certificates-storage/csrs/.gitkeep
+!certificates-storage/certificates/.gitkeep
+!certificates-storage/keystores/.gitkeep
+!certificates-storage/logs/.gitkeep
+
+# Test Coverage
+coverage/
+*.lcov
+
+# Temp Files
+tmp/
+temp/
